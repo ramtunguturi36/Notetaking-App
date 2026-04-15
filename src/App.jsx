@@ -5,6 +5,9 @@ import { INITIAL_NOTES } from './constants/navigation'
 import { getAutoTitle, getAutoTags, summarizeContent, extractActionItems, getRelatedNotes, semanticSearch, normalizeText } from './utils/notes'
 import { LeftRail, TopNav } from './components/layout'
 import { Dashboard, Editor, Search, GraphView } from './components/features'
+import { ToastContainer } from './components/common/Toast'
+
+let toastId = 0
 
 function App() {
   const [notes, setNotes] = useState(INITIAL_NOTES)
@@ -15,6 +18,16 @@ function App() {
   const [chatQuestion, setChatQuestion] = useState('')
   const [chatAnswer, setChatAnswer] = useState('')
   const [showSlashMenu, setShowSlashMenu] = useState(false)
+  const [toasts, setToasts] = useState([])
+
+  function showToast(message, type = 'success') {
+    const id = ++toastId
+    setToasts((prev) => [...prev, { id, message, type }])
+  }
+
+  function removeToast(id) {
+    setToasts((prev) => prev.filter((t) => t.id !== id))
+  }
 
   const selectedNote = useMemo(
     () => notes.find((note) => note.id === selectedNoteId) || null,
@@ -56,6 +69,7 @@ function App() {
     setEditorDraft(draft)
     setSelectedNoteId(draft.id)
     setActiveView('editor')
+    showToast('New note created!', 'success')
   }
 
   function saveCurrentNote() {
@@ -81,6 +95,7 @@ function App() {
     setEditorDraft(nextNote)
     setSelectedNoteId(nextNote.id)
     setActiveView('dashboard')
+    showToast('Note saved successfully!', 'success')
   }
 
   function deleteNote(noteId) {
@@ -92,6 +107,7 @@ function App() {
         setEditorDraft(fallback)
       }
     }
+    showToast('Note deleted!', 'info')
   }
 
   function handleSelectNote(noteId, note) {
@@ -216,6 +232,7 @@ function App() {
           />
         )}
       </main>
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
   )
 }
