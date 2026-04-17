@@ -7,6 +7,7 @@ export function getAutoTitle(content) {
   if (!clean) {
     return 'Untitled Note'
   }
+
   const firstSentence = clean.split(/[.!?\n]/).find((part) => part.trim().length > 6) || clean
   return firstSentence.trim().split(' ').slice(0, 6).join(' ')
 }
@@ -15,9 +16,11 @@ export function getAutoTags(content) {
   const text = normalizeText(content)
   const keywords = ['python', 'design', 'research', 'ai', 'finance', 'backend', 'graph', 'focus', 'productivity', 'meeting']
   const tags = keywords.filter((word) => text.includes(word)).slice(0, 4)
+
   if (!tags.length) {
     return ['general']
   }
+
   return tags
 }
 
@@ -26,6 +29,7 @@ export function summarizeContent(content) {
   if (!cleaned) {
     return 'No content to summarize yet.'
   }
+
   return `${cleaned.split(/[.!?]/).slice(0, 2).join('. ').trim()}.`
 }
 
@@ -41,23 +45,41 @@ export function extractActionItems(content) {
     .filter(Boolean)
 }
 
-export function getRelatedNotes(notes, selectedNote) {
-  if (!selectedNote) {
-    return []
+export function createDraftNote(overrides = {}) {
+  const now = new Date().toISOString()
+
+  return {
+    id: overrides.id || `n${Date.now()}`,
+    title: 'Untitled Note',
+    content: '',
+    tags: ['general'],
+    summary: 'Start writing to generate an AI summary.',
+    actionItems: [],
+    createdAt: now,
+    updatedAt: now,
+    inbox: true,
+    ...overrides,
   }
-  const selectedTagSet = new Set(selectedNote.tags)
-  return notes
-    .filter((note) => note.id !== selectedNote.id)
-    .map((note) => {
-      const overlap = note.tags.filter((tag) => selectedTagSet.has(tag)).length
-      return { note, score: overlap }
-    })
-    .filter((entry) => entry.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 3)
 }
 
-export const CONCEPT_MAP = {
+export function enrichNote(note, timestamp = new Date().toISOString()) {
+  const content = note.content || ''
+  const title = note.title && note.title !== 'Untitled Note' ? note.title : getAutoTitle(content)
+
+  return {
+    ...note,
+    title,
+    content,
+    tags: getAutoTags(content),
+    summary: summarizeContent(content),
+    actionItems: extractActionItems(content),
+    createdAt: note.createdAt || timestamp,
+    updatedAt: timestamp,
+    inbox: note.inbox ?? true,
+  }
+}
+
+const CONCEPT_MAP = {
   money: ['budget', 'finance', 'saving'],
   python: ['backend', 'api', 'asyncio'],
   design: ['ux', 'interface', 'layout'],
@@ -109,27 +131,4 @@ export function semanticSearch(notes, query) {
       .sort((a, b) => b.relatedScore - a.relatedScore)
       .slice(0, 6),
   }
-}
-
-export function sortNotesByPreference(notes, sortMode = 'recent') {
-  const nextNotes = [...notes]
-
-  if (sortMode === 'favorites') {
-    return nextNotes.sort((left, right) => {
-      const favoriteScore = Number(right.favorite) - Number(left.favorite)
-      if (favoriteScore !== 0) {
-        return favoriteScore
-      }
-
-      return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
-    })
-  }
-
-  if (sortMode === 'favorites-only') {
-    return nextNotes
-      .filter((note) => note.favorite)
-      .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())
-  }
-
-  return nextNotes.sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())
 }

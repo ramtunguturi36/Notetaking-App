@@ -1,8 +1,18 @@
 import { useMemo, useState } from 'react'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import './App.css'
 
 import { INITIAL_NOTES } from './constants/navigation'
-import { getAutoTitle, getAutoTags, summarizeContent, extractActionItems, getRelatedNotes, semanticSearch, normalizeText } from './utils/notes'
+import {
+  getAutoTitle,
+  getAutoTags,
+  summarizeContent,
+  extractActionItems,
+  getRelatedNotes,
+  semanticSearch,
+  normalizeText,
+  sortNotesByPreference,
+} from './utils/notes'
 import { LeftRail, TopNav } from './components/layout'
 import { Dashboard, Editor, Search, GraphView } from './components/features'
 import { ToastContainer } from './components/common/Toast'
@@ -10,6 +20,7 @@ import { ToastContainer } from './components/common/Toast'
 let toastId = 0
 
 function App() {
+  const prefersReducedMotion = useReducedMotion()
   const [notes, setNotes] = useState(INITIAL_NOTES)
   const [activeView, setActiveView] = useState('dashboard')
   const [selectedNoteId, setSelectedNoteId] = useState(INITIAL_NOTES[0].id)
@@ -18,6 +29,8 @@ function App() {
   const [chatQuestion, setChatQuestion] = useState('')
   const [chatAnswer, setChatAnswer] = useState('')
   const [showSlashMenu, setShowSlashMenu] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [sortMode, setSortMode] = useState('favorites')
   const [toasts, setToasts] = useState([])
 
   function showToast(message, type = 'success') {
@@ -34,18 +47,39 @@ function App() {
     [notes, selectedNoteId],
   )
 
+  const sortedNotes = useMemo(() => sortNotesByPreference(notes, sortMode), [notes, sortMode])
   const relatedNotes = useMemo(() => getRelatedNotes(notes, selectedNote), [notes, selectedNote])
   const searchResults = useMemo(() => semanticSearch(notes, searchInput), [notes, searchInput])
 
   const noteNodes = useMemo(
     () =>
-      notes.map((note, index) => ({
+      sortedNotes.map((note, index) => ({
         id: note.id,
         title: note.title,
         x: 20 + ((index * 23) % 65),
         y: 24 + ((index * 19) % 55),
       })),
-    [notes],
+    [sortedNotes],
+  )
+
+  const cubeSpecs = useMemo(
+    () => [
+      { x: '8%', y: '14%', size: 12 },
+      { x: '18%', y: '32%', size: 14 },
+      { x: '30%', y: '16%', size: 10 },
+      { x: '40%', y: '40%', size: 16 },
+      { x: '52%', y: '22%', size: 12 },
+      { x: '63%', y: '35%', size: 11 },
+      { x: '74%', y: '18%', size: 14 },
+      { x: '84%', y: '30%', size: 10 },
+      { x: '14%', y: '66%', size: 13 },
+      { x: '26%', y: '78%', size: 12 },
+      { x: '45%', y: '72%', size: 11 },
+      { x: '58%', y: '82%', size: 15 },
+      { x: '71%', y: '68%', size: 12 },
+      { x: '86%', y: '80%', size: 10 },
+    ],
+    [],
   )
 
   function switchToEditor(note) {
@@ -65,6 +99,7 @@ function App() {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       inbox: true,
+      favorite: false,
     }
     setEditorDraft(draft)
     setSelectedNoteId(draft.id)
@@ -98,7 +133,41 @@ function App() {
     showToast('Note saved successfully!', 'success')
   }
 
-  function deleteNote(noteId) {
+  function toggleFavorite(noteId) {
+    setNotes((prev) =>
+      prev.map((note) =>
+        note.id === noteId
+          ? {
+              ...note,
+              favorite: !note.favorite,
+              updatedAt: new Date().toISOString(),
+            }
+          : note,
+      ),
+    )
+  }
+
+  function requestDeleteNote(noteId) {
+    const targetNote = notes.find((note) => note.id === noteId)
+    if (!targetNote) {
+      return
+    }
+
+    setDeleteTarget({ id: targetNote.id, title: targetNote.title })
+  }
+
+  function cancelDeleteNote() {
+    setDeleteTarget(null)
+  }
+
+  function confirmDeleteNote() {
+    if (!deleteTarget) {
+      return
+    }
+
+    const noteId = deleteTarget.id
+    const noteTitle = deleteTarget.title
+
     setNotes((prev) => prev.filter((note) => note.id !== noteId))
     if (selectedNoteId === noteId) {
       const fallback = notes.find((note) => note.id !== noteId)
@@ -107,7 +176,8 @@ function App() {
         setEditorDraft(fallback)
       }
     }
-    showToast('Note deleted!', 'info')
+    setDeleteTarget(null)
+    showToast(`"${noteTitle}" deleted.`, 'info')
   }
 
   function handleSelectNote(noteId, note) {
@@ -162,6 +232,10 @@ function App() {
     )
   }
 
+  const viewTransition = prefersReducedMotion
+    ? { duration: 0 }
+    : { duration: 0.34, ease: [0.25, 0.1, 0.25, 1] }
+
   return (
     <div className="app-shell">
       <link
@@ -173,65 +247,186 @@ function App() {
         href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
       />
 
+      <motion.div
+        className="ambient-bg"
+        initial={prefersReducedMotion ? false : { opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.8 }}
+        aria-hidden="true"
+      >
+        <motion.span
+          className="ambient-orb orb-a"
+          animate={prefersReducedMotion ? {} : { x: [0, 5, -4, 0], y: [0, -4, 3, 0], scale: [1, 1.01, 0.995, 1] }}
+          transition={prefersReducedMotion ? { duration: 0 } : { duration: 42, repeat: Infinity, ease: 'easeInOut' }}
+        />
+        <motion.span
+          className="ambient-orb orb-b"
+          animate={prefersReducedMotion ? {} : { x: [0, -6, 5, 0], y: [0, 4, -3, 0], scale: [1, 0.99, 1.01, 1] }}
+          transition={prefersReducedMotion ? { duration: 0 } : { duration: 48, repeat: Infinity, ease: 'easeInOut' }}
+        />
+        <motion.span
+          className="ambient-orb orb-c"
+          animate={prefersReducedMotion ? {} : { x: [0, 4, -6, 0], y: [0, 3, -4, 0], scale: [1, 1.01, 0.99, 1] }}
+          transition={prefersReducedMotion ? { duration: 0 } : { duration: 54, repeat: Infinity, ease: 'easeInOut' }}
+        />
+
+        <div className="ambient-cube-grid" />
+        <div className="ambient-cube-field">
+          {cubeSpecs.map((cube, index) => (
+            <motion.span
+              key={`${cube.x}-${cube.y}`}
+              className="ambient-cube"
+              style={{ '--x': cube.x, '--y': cube.y, '--size': `${cube.size}px` }}
+              animate={
+                prefersReducedMotion
+                  ? {}
+                  : {
+                      y: [0, -2, 0],
+                      rotate: [45, 47, 45],
+                      opacity: [0.16, 0.28, 0.16],
+                    }
+              }
+              transition={
+                prefersReducedMotion
+                  ? { duration: 0 }
+                  : {
+                      duration: 14 + (index % 5) * 2,
+                      repeat: Infinity,
+                      ease: 'easeInOut',
+                      delay: index * 0.2,
+                    }
+              }
+            />
+          ))}
+        </div>
+      </motion.div>
+
       <LeftRail
         activeView={activeView}
         onViewChange={setActiveView}
         onAddNote={createNewNote}
       />
 
-      <main className="main-stage">
+      <motion.main
+        className="main-stage"
+        initial={prefersReducedMotion ? false : { opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={viewTransition}
+      >
         <TopNav
           onCreateNote={createNewNote}
           onViewChange={setActiveView}
         />
 
-        {activeView === 'dashboard' && (
-          <Dashboard
-            notes={notes}
-            selectedNoteId={selectedNoteId}
-            relatedNotes={relatedNotes}
-            chatQuestion={chatQuestion}
-            chatAnswer={chatAnswer}
-            onSelectNote={handleSelectNote}
-            onEditNote={switchToEditor}
-            onDeleteNote={deleteNote}
-            onSwitchToEditor={switchToEditor}
-            onChatAsk={chatWithNotes}
-            onChatQuestionChange={setChatQuestion}
-          />
-        )}
+        <AnimatePresence mode="wait">
+          <motion.section
+            key={activeView}
+            initial={prefersReducedMotion ? false : { opacity: 0, y: 6 }}
+            animate={
+              prefersReducedMotion
+                ? { opacity: 1 }
+                : { opacity: 1, y: 0 }
+            }
+            exit={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: -4 }}
+            transition={viewTransition}
+          >
+            {activeView === 'dashboard' && (
+              <Dashboard
+                notes={sortedNotes}
+                selectedNoteId={selectedNoteId}
+                relatedNotes={relatedNotes}
+                chatQuestion={chatQuestion}
+                chatAnswer={chatAnswer}
+                onSelectNote={handleSelectNote}
+                onEditNote={switchToEditor}
+                onDeleteNote={requestDeleteNote}
+                onToggleFavorite={toggleFavorite}
+                sortMode={sortMode}
+                onSortModeChange={setSortMode}
+                onSwitchToEditor={switchToEditor}
+                onChatAsk={chatWithNotes}
+                onChatQuestionChange={setChatQuestion}
+              />
+            )}
 
-        {activeView === 'editor' && (
-          <Editor
-            note={editorDraft}
-            onTitleChange={(title) => setEditorDraft((prev) => ({ ...prev, title }))}
-            onContentChange={(content) => setEditorDraft((prev) => ({ ...prev, content }))}
-            onInsertAtCursor={() => {}}
-            onRunSpark={runSpark}
-            onSave={saveCurrentNote}
-            showSlashMenu={showSlashMenu}
-            onToggleSlashMenu={() => setShowSlashMenu((prev) => !prev)}
-          />
-        )}
+            {activeView === 'editor' && (
+              <Editor
+                note={editorDraft}
+                onTitleChange={(title) => setEditorDraft((prev) => ({ ...prev, title }))}
+                onContentChange={(content) => setEditorDraft((prev) => ({ ...prev, content }))}
+                onInsertAtCursor={() => {}}
+                onRunSpark={runSpark}
+                onSave={saveCurrentNote}
+                showSlashMenu={showSlashMenu}
+                onToggleSlashMenu={() => setShowSlashMenu((prev) => !prev)}
+              />
+            )}
 
-        {activeView === 'search' && (
-          <Search
-            searchInput={searchInput}
-            onSearchChange={setSearchInput}
-            searchResults={searchResults}
-            onSelectNote={handleSelectNoteFromSearch}
-          />
-        )}
+            {activeView === 'search' && (
+              <Search
+                searchInput={searchInput}
+                onSearchChange={setSearchInput}
+                searchResults={searchResults}
+                onSelectNote={handleSelectNoteFromSearch}
+              />
+            )}
 
-        {activeView === 'graph' && (
-          <GraphView
-            noteNodes={noteNodes}
-            notes={notes}
-            selectedNoteId={selectedNoteId}
-            onSelectNote={handleSelectNoteFromGraph}
-          />
+            {activeView === 'graph' && (
+              <GraphView
+                noteNodes={noteNodes}
+                notes={notes}
+                selectedNoteId={selectedNoteId}
+                onSelectNote={handleSelectNoteFromGraph}
+              />
+            )}
+          </motion.section>
+        </AnimatePresence>
+      </motion.main>
+
+      <AnimatePresence>
+        {deleteTarget && (
+          <motion.div
+            className="confirm-overlay"
+            initial={prefersReducedMotion ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={prefersReducedMotion ? { opacity: 1 } : { opacity: 0 }}
+            transition={viewTransition}
+            onClick={cancelDeleteNote}
+          >
+            <motion.div
+              className="confirm-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="delete-confirm-title"
+              initial={prefersReducedMotion ? false : { opacity: 0, y: 12, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 8, scale: 0.99 }}
+              transition={viewTransition}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="confirm-head">
+                <span className="material-symbols-outlined">delete</span>
+                <h3 id="delete-confirm-title">Delete note?</h3>
+              </div>
+              <p>
+                You are about to delete
+                {' '}
+                <strong>{deleteTarget.title}</strong>
+                . This action cannot be undone.
+              </p>
+
+              <div className="confirm-actions">
+                <button className="confirm-cancel" onClick={cancelDeleteNote}>Cancel</button>
+                <button className="confirm-delete" onClick={confirmDeleteNote}>
+                  <span className="material-symbols-outlined">delete</span>
+                  Delete note
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
-      </main>
+      </AnimatePresence>
+
       <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
   )

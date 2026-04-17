@@ -10,7 +10,6 @@ export const INITIAL_NOTES = [
     createdAt: '2026-04-11T09:00:00.000Z',
     updatedAt: '2026-04-11T10:10:00.000Z',
     inbox: true,
-    favorite: true,
   },
   {
     id: 'n2',
@@ -26,7 +25,6 @@ export const INITIAL_NOTES = [
     createdAt: '2026-04-10T18:00:00.000Z',
     updatedAt: '2026-04-10T19:20:00.000Z',
     inbox: false,
-    favorite: false,
   },
   {
     id: 'n3',
@@ -39,13 +37,5 @@ export const INITIAL_NOTES = [
     createdAt: '2026-04-09T12:40:00.000Z',
     updatedAt: '2026-04-12T07:30:00.000Z',
     inbox: false,
-    favorite: false,
   },
-]
-
-export const NAV_ITEMS = [
-  { id: 'dashboard', icon: 'dashboard', label: 'Command Center' },
-  { id: 'editor', icon: 'description', label: 'Focus Editor' },
-  { id: 'graph', icon: 'hub', label: 'Graph' },
-  { id: 'search', icon: 'search', label: 'Search' },
 ]

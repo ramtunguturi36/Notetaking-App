@@ -10,20 +10,47 @@ export function Dashboard({
   onSelectNote,
   onEditNote,
   onDeleteNote,
+  onToggleFavorite,
+  sortMode,
+  onSortModeChange,
   onSwitchToEditor,
   onChatAsk,
   onChatQuestionChange,
 }) {
+  const inboxCount = notes.filter((note) => note.inbox).length
+
   return (
     <section className="dashboard-grid">
       <div className="dash-left panel">
-        <h3>Navigation</h3>
-        <ul>
-          <li>Inbox ({notes.filter((note) => note.inbox).length})</li>
-          <li>All Notes ({notes.length})</li>
-          <li>Workspaces</li>
-          <li>Tags</li>
-        </ul>
+        <h3>Overview</h3>
+        <div className="dash-stats">
+          <div className="dash-stat">
+            <span className="material-symbols-outlined dash-stat-icon">inbox</span>
+            <strong>{inboxCount}</strong>
+            <span>Inbox</span>
+          </div>
+          <div className="dash-stat">
+            <span className="material-symbols-outlined dash-stat-icon">notes</span>
+            <strong>{notes.length}</strong>
+            <span>All notes</span>
+          </div>
+        </div>
+        <div className="sort-strip" aria-label="Note sorting">
+          <button
+            className={sortMode === 'favorites' ? 'active' : ''}
+            onClick={() => onSortModeChange('favorites')}
+            title="Favorites first"
+          >
+            <span className="material-symbols-outlined sort-icon">star</span>
+          </button>
+          <button
+            className={sortMode === 'recent' ? 'active' : ''}
+            onClick={() => onSortModeChange('recent')}
+            title="Recent first"
+          >
+            <span className="material-symbols-outlined sort-icon">schedule</span>
+          </button>
+        </div>
         <h4>Recents</h4>
         <div className="recent-list">
           {notes.slice(0, 3).map((note) => (
@@ -36,10 +63,6 @@ export function Dashboard({
       </div>
 
       <div className="dash-middle">
-        <div className="stream-head">
-          <h2>The Stream</h2>
-          <span>AI title, summary, and tags</span>
-        </div>
         <div className="stream-grid">
           {notes.map((note) => (
             <NoteCard
@@ -49,6 +72,7 @@ export function Dashboard({
               onSelect={() => onSelectNote(note.id, note)}
               onEdit={onSwitchToEditor}
               onDelete={onDeleteNote}
+              onToggleFavorite={onToggleFavorite}
             />
           ))}
         </div>
