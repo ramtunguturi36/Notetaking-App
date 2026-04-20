@@ -8,7 +8,7 @@ This repository contains a local-first note-taking UI and a standalone backend A
 
 - Frontend: React + Vite single-page app with a dashboard, editor, semantic search, graph view, local note chat, toasts, and delete confirmation modal.
 - Backend: Express API with layered architecture (routes -> services -> domain -> repository -> JSON file storage).
-- Current coupling: The frontend currently runs entirely in client state and does not call the backend endpoints yet.
+- Current coupling: The frontend now calls the backend `/api/chat` endpoint for Ask responses, while note CRUD/search remain frontend-local state.
 
 ## 2. Tech Stack
 
@@ -473,10 +473,19 @@ CRUD HTTP handlers:
 
 ### C) Chat flow
 
-1. User enters question.
-2. `chatWithNotes()` normalizes query and runs semantic search.
-3. Best direct match wins; fallback to best related.
-4. UI displays generated answer from matched note summary and tags.
+1. User enters a question and clicks Ask.
+2. `chatWithNotes()` in `src/App.jsx` guards duplicate requests using `chatLoading`.
+3. UI immediately switches to loading mode:
+	- `chatLoading = true`
+	- `chatAnswer = "Thinking..."`
+	- Ask button/input become disabled.
+4. Frontend sends `POST /api/chat` to backend with:
+	- normalized `question`
+	- current in-memory `notes` context (id, title, summary, tags, truncated content).
+5. Backend `chatRoutes` forwards to `noteService.askNotes(question, { notes })`.
+6. `askNotes` attempts model answering first (provider configured by env), then deterministic fallback.
+7. Frontend enforces a minimum visible response latency (`MIN_CHAT_RESPONSE_MS`) before revealing final answer.
+8. Final answer is shown and loading state ends.
 
 ### D) Delete flow
 
@@ -486,13 +495,74 @@ CRUD HTTP handlers:
 4. Confirm removes from `notes` and recalculates selected fallback if needed.
 5. Info toast confirms deletion.
 
-### E) Intended backend flow (available but not yet wired from frontend)
+### E) Backend flow currently used by chat
 
 1. Frontend sends HTTP request to Express route.
 2. Route calls service.
-3. Service applies domain transformations and calls repository.
-4. Repository reads/writes JSON file.
+3. Service chooses notes context (payload notes if provided, otherwise repository notes).
+4. Service tries AI provider flow first (`openai`, `ollama`, or `auto`).
+5. If provider fails/unavailable, service falls back to semantic matching from notes.
 5. Response returns to frontend.
+
+## 8.1 Chat + AI Provider Behavior (Important)
+
+This section describes exactly how Ask behaves right now.
+
+### Request shape from frontend
+
+`POST /api/chat` body includes:
+
+```json
+{
+	"question": "count notes",
+	"notes": [
+		{
+			"id": "n1",
+			"title": "...",
+			"summary": "...",
+			"tags": ["..."],
+			"content": "..."
+		}
+	]
+}
+```
+
+### Backend answering strategy
+
+In `backend/src/services/noteService.js`, Ask follows this order:
+
+1. Validate question.
+2. Build compact prompt context from notes.
+3. Try configured model provider (`askModel`).
+4. If model call fails or returns empty output, use deterministic semantic fallback.
+
+### What happens when you do NOT set API keys
+
+If you did not set `OPENAI_API_KEY` (your current case):
+
+- If `AI_PROVIDER=openai`, OpenAI path fails immediately and falls back to semantic answer.
+- If `AI_PROVIDER=auto`, OpenAI fails, then it tries Ollama.
+- If Ollama is not running locally, it also falls back to semantic answer.
+- If `AI_PROVIDER=ollama` and Ollama is unavailable, fallback is used.
+- If `AI_PROVIDER=none`, model step is skipped and fallback is always used.
+
+So even without any API key, Ask still works because backend returns deterministic note-grounded answers.
+
+### Environment variables controlling chat behavior
+
+Defined in `backend/src/config/env.js`:
+
+- `AI_PROVIDER` default: `ollama`
+- `AI_TIMEOUT_MS` default: `6000`
+- `OLLAMA_URL` default: `http://localhost:11434`
+- `OLLAMA_MODEL` default: `llama3.2:3b`
+- `OPENAI_BASE_URL` default: `https://api.openai.com/v1`
+- `OPENAI_API_KEY` default: empty
+- `OPENAI_MODEL` default: `gpt-4o-mini`
+
+### Frontend UX latency behavior
+
+In `src/App.jsx`, Ask intentionally waits at least `MIN_CHAT_RESPONSE_MS` (currently `900`) before final output, so users can perceive the answering state instead of instant flip.
 
 ## 8. UI Component Library Architecture
 
@@ -601,16 +671,17 @@ Observations:
 ### Chat
 
 - `POST /api/chat`
-- Body: `{ "question": "What did I decide about graph view?" }`
+- Body: `{ "question": "What did I decide about graph view?", "notes": [...] }`
 - Response: `{ answer: "..." }`
 
 ## 12. Known Current Gaps
 
-1. Frontend does not call backend endpoints yet.
+1. Frontend calls backend for chat, but note CRUD/search are still frontend-local only.
 2. Frontend and backend utility logic are duplicated (`src/utils/notes.js` and `backend/src/domain/noteUtils.js`).
 3. Graph node positioning is deterministic pseudo-layout (not semantic force graph).
 4. No automated tests are included in this repository.
-5. `src/services` folder is present but empty, so API client abstraction is not implemented yet.
+5. `src/services` folder is present but empty, so API client abstraction remains partial.
+6. Model answering quality depends on environment availability (API key and/or running Ollama).
 
 ## 13. How to Run
 
@@ -636,7 +707,7 @@ Backend default URL:
 ## 14. Suggested Next Engineering Steps
 
 1. Implement frontend API client layer in `src/services`.
-2. Wire `App` CRUD/search/chat actions to backend endpoints.
+2. Wire note CRUD and semantic search to backend endpoints (chat is already wired).
 3. Add optimistic updates + error toasts + retry behavior.
 4. Add unit tests for utility/domain modules.
 5. Add integration tests for routes and service layer.

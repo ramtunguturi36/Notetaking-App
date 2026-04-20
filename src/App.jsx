@@ -11,6 +11,7 @@ import {
   getRelatedNotes,
   semanticSearch,
   normalizeText,
+  stripRichText,
   sortNotesByPreference,
 } from './utils/notes'
 import { LeftRail, TopNav } from './components/layout'
@@ -18,6 +19,8 @@ import { Dashboard, Editor, Search, GraphView } from './components/features'
 import { ToastContainer } from './components/common/Toast'
 
 let toastId = 0
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'
+const MIN_CHAT_RESPONSE_MS = 900
 
 function App() {
   const prefersReducedMotion = useReducedMotion()
@@ -28,6 +31,7 @@ function App() {
   const [searchInput, setSearchInput] = useState('python tips')
   const [chatQuestion, setChatQuestion] = useState('')
   const [chatAnswer, setChatAnswer] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
   const [showSlashMenu, setShowSlashMenu] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [sortMode, setSortMode] = useState('favorites')
@@ -107,16 +111,20 @@ function App() {
     showToast('New note created!', 'success')
   }
 
-  function saveCurrentNote() {
+  function saveCurrentNote(contentOverride) {
+    const baseDraft = typeof contentOverride === 'string'
+      ? { ...editorDraft, content: contentOverride }
+      : editorDraft
+
     const nextNote = {
-      ...editorDraft,
+      ...baseDraft,
       title:
-        editorDraft.title && editorDraft.title !== 'Untitled Note'
-          ? editorDraft.title
-          : getAutoTitle(editorDraft.content),
-      tags: getAutoTags(editorDraft.content),
-      summary: summarizeContent(editorDraft.content),
-      actionItems: extractActionItems(editorDraft.content),
+        baseDraft.title && baseDraft.title !== 'Untitled Note'
+          ? baseDraft.title
+          : getAutoTitle(baseDraft.content),
+      tags: getAutoTags(baseDraft.content),
+      summary: summarizeContent(baseDraft.content),
+      actionItems: extractActionItems(baseDraft.content),
       updatedAt: new Date().toISOString(),
     }
 
@@ -196,40 +204,100 @@ function App() {
     }
   }
 
-  function runSpark(action) {
+  function runSpark(action, contentOverride) {
+    const contentSource = typeof contentOverride === 'string' ? contentOverride : editorDraft.content
+
     if (action === 'summary') {
-      setEditorDraft((prev) => ({ ...prev, summary: summarizeContent(prev.content) }))
+      setEditorDraft((prev) => ({ ...prev, content: contentSource, summary: summarizeContent(contentSource) }))
     }
+
     if (action === 'actions') {
-      setEditorDraft((prev) => ({ ...prev, actionItems: extractActionItems(prev.content) }))
+      setEditorDraft((prev) => ({ ...prev, content: contentSource, actionItems: extractActionItems(contentSource) }))
     }
+
     if (action === 'grammar') {
-      const polished = editorDraft.content
+      const polishedText = stripRichText(contentSource)
         .replace(/\s{2,}/g, ' ')
         .replace(/\bi\b/g, 'I')
+        .replace(/\s+,/g, ',')
         .replace(/\s+\./g, '.')
-      setEditorDraft((prev) => ({ ...prev, content: polished }))
+        .replace(/\s+!/g, '!')
+        .replace(/\s+\?/g, '?')
+        .trim()
+
+      const polishedHtml = polishedText
+        .split(/\n{2,}/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => `<p>${line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`)
+        .join('')
+
+      setEditorDraft((prev) => ({ ...prev, content: polishedHtml || prev.content }))
     }
   }
 
-  function chatWithNotes() {
+  async function chatWithNotes() {
+    if (chatLoading) {
+      return
+    }
+
     const question = normalizeText(chatQuestion)
     if (!question.trim()) {
       setChatAnswer('Ask a question about your saved notes.')
       return
     }
 
-    const bestMatch = semanticSearch(notes, question).direct[0] || semanticSearch(notes, question).related[0]
-    if (!bestMatch) {
-      setChatAnswer('I could not find a relevant note in your local brain yet.')
-      return
-    }
+    setChatLoading(true)
+    setChatAnswer('Thinking...')
+    const startedAt = Date.now()
+    let finalAnswer = 'I could not find a relevant note in your local brain yet.'
 
-    setChatAnswer(
-      `From "${bestMatch.note.title}": ${bestMatch.note.summary} Top tags: ${bestMatch.note.tags
-        .map((tag) => `#${tag}`)
-        .join(' ')}.`,
-    )
+    try {
+      const payload = {
+        question,
+        notes: notes.map((note) => ({
+          id: note.id,
+          title: note.title,
+          summary: note.summary,
+          tags: note.tags,
+          content: stripRichText(note.content).slice(0, 1200),
+        })),
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        throw new Error('Chat endpoint returned an error')
+      }
+
+      const result = await response.json()
+      if (result?.answer) {
+        finalAnswer = result.answer
+      } else {
+        throw new Error('No answer in chat response')
+      }
+    } catch {
+      const fallbackResults = semanticSearch(notes, question)
+      const bestMatch = fallbackResults.direct[0] || fallbackResults.related[0]
+
+      if (bestMatch) {
+        finalAnswer = `From "${bestMatch.note.title}": ${bestMatch.note.summary} Top tags: ${bestMatch.note.tags
+          .map((tag) => `#${tag}`)
+          .join(' ')}.`
+      }
+    } finally {
+      const elapsed = Date.now() - startedAt
+      if (elapsed < MIN_CHAT_RESPONSE_MS) {
+        await new Promise((resolve) => setTimeout(resolve, MIN_CHAT_RESPONSE_MS - elapsed))
+      }
+
+      setChatAnswer(finalAnswer)
+      setChatLoading(false)
+    }
   }
 
   const viewTransition = prefersReducedMotion
@@ -337,6 +405,7 @@ function App() {
                 relatedNotes={relatedNotes}
                 chatQuestion={chatQuestion}
                 chatAnswer={chatAnswer}
+                chatLoading={chatLoading}
                 onSelectNote={handleSelectNote}
                 onEditNote={switchToEditor}
                 onDeleteNote={requestDeleteNote}

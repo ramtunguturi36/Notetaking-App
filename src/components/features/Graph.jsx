@@ -47,6 +47,10 @@
 // }
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
+import {
+  CSS2DObject,
+  CSS2DRenderer,
+} from "three/addons/renderers/CSS2DRenderer.js";
 
 const TAG_COLORS = {
   design: 0x8b80ff,
@@ -75,6 +79,16 @@ export function GraphView({ notes, selectedNoteId, onSelectNote }) {
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     renderer.setClearColor(0x0a0a12, 1);
     el.appendChild(renderer.domElement);
+
+    const labelRenderer = new CSS2DRenderer();
+    labelRenderer.setSize(el.clientWidth, el.clientHeight);
+    labelRenderer.domElement.style.position = "absolute";
+    labelRenderer.domElement.style.top = "0";
+    labelRenderer.domElement.style.left = "0";
+    labelRenderer.domElement.style.width = "100%";
+    labelRenderer.domElement.style.height = "100%";
+    labelRenderer.domElement.style.pointerEvents = "none";
+    el.appendChild(labelRenderer.domElement);
 
     const scene = new THREE.Scene();
     scene.fog = new THREE.FogExp2(0x0a0a12, 0.025);
@@ -151,6 +165,32 @@ export function GraphView({ notes, selectedNoteId, onSelectNote }) {
       mesh.add(ring);
       ringMeshes.push(ring);
 
+      const labelElement = document.createElement("button");
+      labelElement.type = "button";
+      labelElement.style.padding = "4px 8px";
+      labelElement.style.background = "rgba(10, 10, 18, 0.85)";
+      labelElement.style.border = "1px solid rgba(139, 128, 255, 0.5)";
+      labelElement.style.borderRadius = "4px";
+      labelElement.style.color = "#d0d0ff";
+      labelElement.style.fontSize = "11px";
+      labelElement.style.fontWeight = "500";
+      labelElement.style.whiteSpace = "nowrap";
+      labelElement.style.cursor = "pointer";
+      labelElement.style.maxWidth = "160px";
+      labelElement.style.overflow = "hidden";
+      labelElement.style.textOverflow = "ellipsis";
+      labelElement.style.pointerEvents = "auto";
+      labelElement.textContent = note.title;
+      labelElement.addEventListener("click", (event) => {
+        event.stopPropagation();
+        onSelectNote(note.id);
+      });
+
+      const labelObject = new CSS2DObject(labelElement);
+      labelObject.position.set(0, 1.0, 0);
+      labelObject.center.set(0.5, 1.1);
+      mesh.add(labelObject);
+
       scene.add(mesh);
       nodeMeshes.push(mesh);
     });
@@ -194,38 +234,6 @@ export function GraphView({ notes, selectedNoteId, onSelectNote }) {
         }
       }
     }
-
-    // Create labels container
-    const labelsContainer = document.createElement("div");
-    labelsContainer.style.position = "absolute";
-    labelsContainer.style.top = "0";
-    labelsContainer.style.left = "0";
-    labelsContainer.style.width = "100%";
-    labelsContainer.style.height = "100%";
-    labelsContainer.style.pointerEvents = "none";
-    el.appendChild(labelsContainer);
-
-    const labels = notes.map((note) => {
-      const label = document.createElement("div");
-      label.style.position = "absolute";
-      label.style.padding = "4px 8px";
-      label.style.background = "rgba(10, 10, 18, 0.85)";
-      label.style.border = "1px solid rgba(139, 128, 255, 0.5)";
-      label.style.borderRadius = "4px";
-      label.style.color = "#d0d0ff";
-      label.style.fontSize = "11px";
-      label.style.fontWeight = "500";
-      label.style.whiteSpace = "nowrap";
-      label.style.pointerEvents = "auto";
-      label.style.cursor = "pointer";
-      label.style.maxWidth = "140px";
-      label.style.overflow = "hidden";
-      label.style.textOverflow = "ellipsis";
-      label.textContent = note.title;
-      label.onClick = () => onSelectNote(note.id);
-      labelsContainer.appendChild(label);
-      return label;
-    });
 
     // Removed grid helper for cleaner view
 
@@ -284,11 +292,13 @@ export function GraphView({ notes, selectedNoteId, onSelectNote }) {
     // Resize
     const ro = new ResizeObserver(() => {
       renderer.setSize(el.clientWidth, el.clientHeight, false);
+      labelRenderer.setSize(el.clientWidth, el.clientHeight);
       camera.aspect = el.clientWidth / el.clientHeight;
       camera.updateProjectionMatrix();
     });
     ro.observe(el);
     renderer.setSize(el.clientWidth, el.clientHeight, false);
+    labelRenderer.setSize(el.clientWidth, el.clientHeight);
 
     let t = 0,
       rafId;
@@ -309,18 +319,6 @@ export function GraphView({ notes, selectedNoteId, onSelectNote }) {
       nodeMeshes.forEach((m, i) => {
         m.position.y = basePositions[i].y + Math.sin(t * 0.5 + i * 1.4) * 0.18;
         ringMeshes[i].rotation.z = t * 0.4 + i * 0.8;
-
-        // Project 3D position to 2D screen coords for labels
-        const pos3D = new THREE.Vector3();
-        m.getWorldPosition(pos3D);
-        const pos2D = pos3D.project(camera);
-        const rect = el.getBoundingClientRect();
-        const x = ((pos2D.x + 1) / 2) * rect.width;
-        const y = ((1 - pos2D.y) / 2) * rect.height - 35; // Offset above node
-
-        labels[i].style.left = `${x - 70}px`; // Center the label
-        labels[i].style.top = `${y}px`;
-        labels[i].style.opacity = pos2D.z < 1 ? 1 : 0.2; // Fade if behind camera
       });
       edgeParticles.forEach((ep) => {
         ep.userData.t = (ep.userData.t + 0.004) % 1;
@@ -328,6 +326,7 @@ export function GraphView({ notes, selectedNoteId, onSelectNote }) {
         ep.material.opacity = 0.3 + 0.5 * Math.sin(ep.userData.t * Math.PI);
       });
       renderer.render(scene, camera);
+      labelRenderer.render(scene, camera);
     };
     animate();
 
@@ -341,7 +340,9 @@ export function GraphView({ notes, selectedNoteId, onSelectNote }) {
       el.removeEventListener("click", onClick);
       renderer.dispose();
       if (el.contains(renderer.domElement)) el.removeChild(renderer.domElement);
-      if (el.contains(labelsContainer)) el.removeChild(labelsContainer);
+      if (el.contains(labelRenderer.domElement)) {
+        el.removeChild(labelRenderer.domElement);
+      }
     };
   }, [notes, selectedNoteId]);
 

@@ -1,9 +1,40 @@
+function decodeEntities(value) {
+  return value
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+}
+
+export function stripRichText(value = '') {
+  if (!value) {
+    return ''
+  }
+
+  const normalized = String(value)
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<br\s*\/?\s*>/gi, '\n')
+    .replace(/<\/(p|div|h[1-6]|li|tr|ul|ol|table|blockquote)>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '- ')
+    .replace(/<[^>]+>/g, ' ')
+
+  return decodeEntities(normalized)
+    .replace(/\r/g, '')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim()
+}
+
 export function normalizeText(value) {
-  return value.toLowerCase().replace(/[^a-z0-9\s#]/g, ' ')
+  return stripRichText(value).toLowerCase().replace(/[^a-z0-9\s#]/g, ' ')
 }
 
 export function getAutoTitle(content) {
-  const clean = content.replace(/[#*_`>-]/g, '').trim()
+  const clean = stripRichText(content).replace(/[#*_`>-]/g, '').trim()
   if (!clean) {
     return 'Untitled Note'
   }
@@ -22,7 +53,7 @@ export function getAutoTags(content) {
 }
 
 export function summarizeContent(content) {
-  const cleaned = content.replace(/\s+/g, ' ').trim()
+  const cleaned = stripRichText(content).replace(/\s+/g, ' ').trim()
   if (!cleaned) {
     return 'No content to summarize yet.'
   }
@@ -30,7 +61,7 @@ export function summarizeContent(content) {
 }
 
 export function extractActionItems(content) {
-  const lines = content
+  const lines = stripRichText(content)
     .split(/[\n.]/)
     .map((line) => line.trim())
     .filter(Boolean)
