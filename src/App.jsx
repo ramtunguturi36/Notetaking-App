@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import "./App.css";
 
@@ -25,6 +25,7 @@ const MIN_CHAT_RESPONSE_MS = 900;
 
 function App() {
   const prefersReducedMotion = useReducedMotion();
+  const themeTimersRef = useRef([]);
   const [theme, setTheme] = useState(() => {
     const storedTheme =
       typeof window !== "undefined"
@@ -51,6 +52,7 @@ function App() {
   const [chatQuestion, setChatQuestion] = useState("");
   const [chatAnswer, setChatAnswer] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+  const [isThemeSwitching, setIsThemeSwitching] = useState(false);
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [sortMode, setSortMode] = useState("favorites");
@@ -60,6 +62,34 @@ function App() {
     document.documentElement.setAttribute("data-theme", theme);
     window.localStorage.setItem("theme", theme);
   }, [theme]);
+
+  useEffect(
+    () => () => {
+      themeTimersRef.current.forEach((timerId) => clearTimeout(timerId));
+      themeTimersRef.current = [];
+    },
+    [],
+  );
+
+  function handleToggleTheme() {
+    if (isThemeSwitching) {
+      return;
+    }
+
+    setIsThemeSwitching(true);
+    const applyDelayMs = prefersReducedMotion ? 90 : 260;
+    const settleDurationMs = prefersReducedMotion ? 210 : 720;
+
+    const applyTimer = setTimeout(() => {
+      setTheme((prev) => (prev === "light" ? "dark" : "light"));
+    }, applyDelayMs);
+
+    const settleTimer = setTimeout(() => {
+      setIsThemeSwitching(false);
+    }, applyDelayMs + settleDurationMs);
+
+    themeTimersRef.current.push(applyTimer, settleTimer);
+  }
 
   function showToast(message, type = "success") {
     const id = ++toastId;
@@ -382,7 +412,9 @@ function App() {
     : { duration: 0.34, ease: [0.25, 0.1, 0.25, 1] };
 
   return (
-    <div className={`app-shell theme-${theme}`}>
+    <div
+      className={`app-shell theme-${theme} ${isThemeSwitching ? "theme-switching" : ""}`.trim()}
+    >
       <link
         rel="stylesheet"
         href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;400;700;800&family=Inter:wght@300;400;500;600&display=swap"
@@ -597,9 +629,8 @@ function App() {
           onCreateNote={createNewNote}
           onViewChange={setActiveView}
           theme={theme}
-          onToggleTheme={() =>
-            setTheme((prev) => (prev === "light" ? "dark" : "light"))
-          }
+          isThemeSwitching={isThemeSwitching}
+          onToggleTheme={handleToggleTheme}
         />
 
         <AnimatePresence mode="wait">

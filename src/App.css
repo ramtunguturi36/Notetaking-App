@@ -505,8 +505,69 @@ textarea:focus-visible,
   gap: 0.35rem;
 }
 
+.theme-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.78;
+}
+
+.theme-toggle.is-switching .material-symbols-outlined {
+  animation: theme-toggle-spin 720ms ease;
+}
+
 .theme-toggle .material-symbols-outlined {
   font-size: 1.05rem;
+}
+
+@keyframes theme-toggle-spin {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+
+  40% {
+    transform: rotate(110deg) scale(1.08);
+  }
+
+  100% {
+    transform: rotate(180deg) scale(1);
+  }
+}
+
+.app-shell.theme-switching,
+.app-shell.theme-switching * {
+  transition:
+    background-color 620ms ease,
+    color 600ms ease,
+    border-color 600ms ease,
+    box-shadow 600ms ease,
+    opacity 560ms ease;
+}
+
+.app-shell.theme-switching::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 50% 10%,
+    rgba(154, 170, 255, 0.12),
+    transparent 52%
+  );
+  animation: theme-shell-fade 760ms ease;
+  z-index: 1;
+}
+
+@keyframes theme-shell-fade {
+  0% {
+    opacity: 0;
+  }
+
+  35% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
 }
 
 button {
