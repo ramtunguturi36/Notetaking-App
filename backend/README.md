@@ -30,7 +30,7 @@ Environment variables:
 - `AI_PROVIDER` = `ollama` | `openai` | `auto` | `none` (default: `ollama`)
 - `AI_TIMEOUT_MS` (default: `6000`)
 - `OLLAMA_URL` (default: `http://localhost:11434`)
-- `OLLAMA_MODEL` (default: `llama3.2:3b`)
+- `OLLAMA_MODEL` (default: `gemma4:e2b`)
 - `OPENAI_BASE_URL` (default: `https://api.openai.com/v1`)
 - `OPENAI_API_KEY`
 - `OPENAI_MODEL` (default: `gpt-4o-mini`)
@@ -39,7 +39,15 @@ Environment variables:
 
 ```json
 {
-	"question": "What did I decide about focus mode?",
-	"notes": [{ "id": "n1", "title": "...", "summary": "...", "tags": ["..."], "content": "..." }]
+  "question": "What did I decide about focus mode?",
+  "notes": [
+    {
+      "id": "n1",
+      "title": "...",
+      "summary": "...",
+      "tags": ["..."],
+      "content": "..."
+    }
+  ]
 }
 ```
