@@ -1,4 +1,16 @@
 export function NoteCard({ note, isSelected, onSelect, onEdit, onDelete, onToggleFavorite }) {
+  const createdAt = new Date(note.createdAt)
+  const createdLabel = Number.isNaN(createdAt.getTime())
+    ? 'Unknown date'
+    : createdAt.toLocaleString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      })
+
   return (
     <article
       key={note.id}
@@ -6,7 +18,7 @@ export function NoteCard({ note, isSelected, onSelect, onEdit, onDelete, onToggl
       onClick={onSelect}
     >
       <div className="card-top">
-        <span>{note.inbox ? 'Inbox' : 'Processed'}</span>
+        <time className="card-date" dateTime={note.createdAt || ''}>{createdLabel}</time>
         <div className="card-top-actions">
           <button
             className={`icon-btn favorite-btn ${note.favorite ? 'active' : ''}`}

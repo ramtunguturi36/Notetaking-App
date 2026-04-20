@@ -19,7 +19,7 @@ export function Dashboard({
   onChatAsk,
   onChatQuestionChange,
 }) {
-  const inboxCount = notes.filter((note) => note.inbox).length
+  const favoriteCount = notes.filter((note) => note.favorite).length
   const tagCount = new Set(notes.flatMap((note) => note.tags || [])).size
   const taskCount = notes.reduce((total, note) => {
     if (note.actionItems?.length) {
@@ -36,9 +36,9 @@ export function Dashboard({
           <h3>Overview</h3>
           <div className="dash-stats">
             <div className="dash-stat">
-              <span className="material-symbols-outlined dash-stat-icon">inbox</span>
-              <strong>{inboxCount}</strong>
-              <span>Inbox</span>
+              <span className="material-symbols-outlined dash-stat-icon">star</span>
+              <strong>{favoriteCount}</strong>
+              <span>Favorites</span>
             </div>
             <div className="dash-stat">
               <span className="material-symbols-outlined dash-stat-icon">notes</span>

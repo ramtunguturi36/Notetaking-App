@@ -628,6 +628,13 @@ button {
 	align-items: center;
 }
 
+.card-date {
+	font-size: 0.7rem;
+	color: #9794a7;
+	text-transform: none;
+	letter-spacing: 0.04em;
+}
+
 .card-top-actions {
 	display: flex;
 	align-items: center;
