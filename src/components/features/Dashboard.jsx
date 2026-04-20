@@ -1,5 +1,12 @@
+import { useEffect, useState } from 'react'
+import { extractActionItems } from '../../utils/notes'
 import { NoteCard } from '../notes/NoteCard'
 import { ChatBox } from '../notes/ChatBox'
+
+const FALLBACK_DAILY_THOUGHT = {
+  q: 'Focus is not about saying yes - it is about saying no to everything else.',
+  a: 'Steve Jobs',
+}
 
 export function Dashboard({
   notes,
@@ -17,7 +24,50 @@ export function Dashboard({
   onChatAsk,
   onChatQuestionChange,
 }) {
+  const [dailyThought, setDailyThought] = useState(FALLBACK_DAILY_THOUGHT)
   const inboxCount = notes.filter((note) => note.inbox).length
+  const tagCount = new Set(notes.flatMap((note) => note.tags || [])).size
+  const taskCount = notes.reduce((total, note) => {
+    if (note.actionItems?.length) {
+      return total + note.actionItems.length
+    }
+
+    return total + extractActionItems(note.content || '').length
+  }, 0)
+
+  useEffect(() => {
+    let ignore = false
+
+    async function loadDailyThought() {
+      try {
+        const response = await fetch('https://zenquotes.io/api/today')
+        if (!response.ok) {
+          throw new Error('Unable to load daily thought')
+        }
+
+        const payload = await response.json()
+        const quote = Array.isArray(payload) ? payload[0] : null
+
+        if (!quote?.q || !quote?.a) {
+          throw new Error('Invalid daily thought payload')
+        }
+
+        if (!ignore) {
+          setDailyThought({ q: quote.q, a: quote.a })
+        }
+      } catch {
+        if (!ignore) {
+          setDailyThought(FALLBACK_DAILY_THOUGHT)
+        }
+      }
+    }
+
+    loadDailyThought()
+
+    return () => {
+      ignore = true
+    }
+  }, [])
 
   return (
     <section className="dashboard-grid">
@@ -33,6 +83,16 @@ export function Dashboard({
             <span className="material-symbols-outlined dash-stat-icon">notes</span>
             <strong>{notes.length}</strong>
             <span>All notes</span>
+          </div>
+          <div className="dash-stat">
+            <span className="material-symbols-outlined dash-stat-icon">sell</span>
+            <strong>{tagCount}</strong>
+            <span>Tags</span>
+          </div>
+          <div className="dash-stat">
+            <span className="material-symbols-outlined dash-stat-icon">task_alt</span>
+            <strong>{taskCount}</strong>
+            <span>Tasks</span>
           </div>
         </div>
         <div className="sort-strip" aria-label="Note sorting">
@@ -51,14 +111,9 @@ export function Dashboard({
             <span className="material-symbols-outlined sort-icon">schedule</span>
           </button>
         </div>
-        <h4>Recents</h4>
-        <div className="recent-list">
-          {notes.slice(0, 3).map((note) => (
-            <button key={note.id} onClick={() => onSwitchToEditor(note)} className="recent-card">
-              <strong>{note.title}</strong>
-              <span>{new Date(note.updatedAt).toLocaleDateString()}</span>
-            </button>
-          ))}
+        <div className="daily-thought" aria-live="polite">
+          <p className="daily-thought-quote">&quot;{dailyThought.q}&quot;</p>
+          <p className="daily-thought-author">{dailyThought.a}</p>
         </div>
       </div>
 
