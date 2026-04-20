@@ -1,9 +1,5 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import {
-  CSS2DObject,
-  CSS2DRenderer,
-} from "three/addons/renderers/CSS2DRenderer.js";
 
 const GRAPH_THEME = {
   dark: {
@@ -46,15 +42,18 @@ export function GraphView({
     const el = mountRef.current;
     const palette = theme === "light" ? GRAPH_THEME.light : GRAPH_THEME.dark;
 
+    // WebGL renderer
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     renderer.setClearColor(palette.backgroundHex, 1);
+    renderer.domElement.style.cssText = "position:absolute;top:0;left:0;width:100%;height:100%;";
     el.appendChild(renderer.domElement);
 
-    const labelRenderer = new CSS2DRenderer();
-    labelRenderer.domElement.style.cssText =
-      "position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;";
-    el.appendChild(labelRenderer.domElement);
+    // Label container — plain div, absolutely positioned over canvas
+    const labelContainer = document.createElement("div");
+    labelContainer.style.cssText =
+      "position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:hidden;";
+    el.appendChild(labelContainer);
 
     const scene = new THREE.Scene();
     scene.fog = new THREE.FogExp2(palette.fogHex, 0.022);
@@ -63,14 +62,11 @@ export function GraphView({
     camera.position.set(0, 0, 20);
 
     scene.add(new THREE.AmbientLight(0xffffff, palette.ambientIntensity));
-    const dir = new THREE.DirectionalLight(
-      0xffffff,
-      palette.directionalIntensity,
-    );
+    const dir = new THREE.DirectionalLight(0xffffff, palette.directionalIntensity);
     dir.position.set(5, 10, 8);
     scene.add(dir);
 
-    // Subtle starfield
+    // Starfield
     const starGeo = new THREE.BufferGeometry();
     const sp = new Float32Array(400 * 3).map(() => (Math.random() - 0.5) * 100);
     starGeo.setAttribute("position", new THREE.BufferAttribute(sp, 3));
@@ -86,7 +82,7 @@ export function GraphView({
       ),
     );
 
-    // Node positions — fibonacci sphere spread
+    // Node positions — fibonacci sphere
     const positions = notes.map((_, i) => {
       const phi = Math.acos(1 - (2 * (i + 0.5)) / notes.length);
       const theta = Math.PI * (1 + Math.sqrt(5)) * i;
@@ -100,6 +96,8 @@ export function GraphView({
 
     const nodeMeshes = [];
     const basePositions = positions.map((p) => p.clone());
+    // Label buttons — managed manually
+    const labelEls = [];
 
     notes.forEach((note, i) => {
       const isSelected = note.id === selectedNoteId;
@@ -110,9 +108,7 @@ export function GraphView({
           color: isSelected ? palette.selectedColor : palette.nodeColor,
           roughness: 0.32,
           metalness: 0.28,
-          emissive: isSelected
-            ? palette.selectedEmissive
-            : palette.nodeEmissive,
+          emissive: isSelected ? palette.selectedEmissive : palette.nodeEmissive,
           emissiveIntensity: isSelected ? 0.9 : 0.38,
         }),
       );
@@ -121,22 +117,22 @@ export function GraphView({
       scene.add(mesh);
       nodeMeshes.push(mesh);
 
-      // Label
+      // Create label button in the overlay div
       const btn = document.createElement("button");
       btn.type = "button";
       btn.textContent = note.title;
       btn.className = `graph-node-label ${isSelected ? "active" : ""}`.trim();
+      btn.style.cssText =
+        "position:absolute;transform:translate(-50%,-130%);pointer-events:auto;";
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
         onSelectNote(note.id);
       });
-      const labelObj = new CSS2DObject(btn);
-      labelObj.position.set(0, 0.42, 0);
-      labelObj.center.set(0.5, 1.1);
-      mesh.add(labelObj);
+      labelContainer.appendChild(btn);
+      labelEls.push({ btn, mesh });
     });
 
-    // Edges — thin, low opacity
+    // Edges
     for (let a = 0; a < positions.length; a++) {
       for (let b = a + 1; b < positions.length; b++) {
         const geo = new THREE.BufferGeometry().setFromPoints([
@@ -156,7 +152,7 @@ export function GraphView({
       }
     }
 
-    // Pulse particles along edges
+    // Pulse particles
     const pulseParticles = [];
     for (let a = 0; a < positions.length; a++) {
       for (let b = a + 1; b < positions.length; b++) {
@@ -181,51 +177,29 @@ export function GraphView({
       }
     }
 
-    // Orbit
+    // Orbit controls
     let sph = { theta: 0.3, phi: Math.PI / 2.1, r: 20 };
     let tgt = { ...sph };
-    let isDragging = false,
-      prevMouse = { x: 0, y: 0 };
+    let isDragging = false, prevMouse = { x: 0, y: 0 };
     let autoSpin = true;
 
-    const onMD = (e) => {
-      isDragging = true;
-      prevMouse = { x: e.clientX, y: e.clientY };
-      autoSpin = false;
-    };
-    const onMU = () => {
-      isDragging = false;
-    };
+    const onMD = (e) => { isDragging = true; prevMouse = { x: e.clientX, y: e.clientY }; autoSpin = false; };
+    const onMU = () => { isDragging = false; };
     const onMM = (e) => {
       if (!isDragging) return;
       tgt.theta -= (e.clientX - prevMouse.x) * 0.005;
-      tgt.phi = Math.max(
-        0.3,
-        Math.min(Math.PI - 0.3, tgt.phi - (e.clientY - prevMouse.y) * 0.005),
-      );
+      tgt.phi = Math.max(0.3, Math.min(Math.PI - 0.3, tgt.phi - (e.clientY - prevMouse.y) * 0.005));
       prevMouse = { x: e.clientX, y: e.clientY };
     };
-    const onWH = (e) => {
-      tgt.r = Math.max(8, Math.min(38, tgt.r + e.deltaY * 0.04));
-      e.preventDefault();
-    };
+    const onWH = (e) => { tgt.r = Math.max(8, Math.min(38, tgt.r + e.deltaY * 0.04)); e.preventDefault(); };
 
     let lastTouch = null;
-    const onTS = (e) => {
-      lastTouch = e.touches[0];
-      autoSpin = false;
-    };
+    const onTS = (e) => { lastTouch = e.touches[0]; autoSpin = false; };
     const onTM = (e) => {
       if (!lastTouch) return;
       const t = e.touches[0];
       tgt.theta -= (t.clientX - lastTouch.clientX) * 0.005;
-      tgt.phi = Math.max(
-        0.3,
-        Math.min(
-          Math.PI - 0.3,
-          tgt.phi - (t.clientY - lastTouch.clientY) * 0.005,
-        ),
-      );
+      tgt.phi = Math.max(0.3, Math.min(Math.PI - 0.3, tgt.phi - (t.clientY - lastTouch.clientY) * 0.005));
       lastTouch = t;
       e.preventDefault();
     };
@@ -252,19 +226,17 @@ export function GraphView({
     el.addEventListener("click", onClick);
 
     const ro = new ResizeObserver(() => {
-      const W = el.clientWidth,
-        H = el.clientHeight;
+      const W = el.clientWidth, H = el.clientHeight;
       renderer.setSize(W, H, false);
-      labelRenderer.setSize(W, H);
       camera.aspect = W / H;
       camera.updateProjectionMatrix();
     });
     ro.observe(el);
     renderer.setSize(el.clientWidth, el.clientHeight, false);
-    labelRenderer.setSize(el.clientWidth, el.clientHeight);
 
-    let time = 0,
-      rafId;
+    const tmpVec = new THREE.Vector3();
+
+    let time = 0, rafId;
     const animate = () => {
       rafId = requestAnimationFrame(animate);
       time += 0.01;
@@ -283,20 +255,31 @@ export function GraphView({
 
       // Gentle bob
       nodeMeshes.forEach((m, i) => {
-        m.position.y =
-          basePositions[i].y + Math.sin(time * 0.5 + i * 1.1) * 0.12;
+        m.position.y = basePositions[i].y + Math.sin(time * 0.5 + i * 1.1) * 0.12;
       });
 
       // Pulse travel
       pulseParticles.forEach((pp) => {
         pp.userData.t = (pp.userData.t + pp.userData.speed) % 1;
         pp.position.lerpVectors(pp.userData.pA, pp.userData.pB, pp.userData.t);
-        const arc = Math.sin(pp.userData.t * Math.PI);
-        pp.material.opacity = arc * 0.45;
+        pp.material.opacity = Math.sin(pp.userData.t * Math.PI) * 0.45;
       });
 
       renderer.render(scene, camera);
-      labelRenderer.render(scene, camera);
+
+      // Project each node to screen coords and position label
+      const W = el.clientWidth, H = el.clientHeight;
+      labelEls.forEach(({ btn, mesh }) => {
+        tmpVec.setFromMatrixPosition(mesh.matrixWorld);
+        tmpVec.project(camera);
+        // tmpVec is now in NDC [-1,1]; convert to pixel coords relative to container
+        const x = (tmpVec.x * 0.5 + 0.5) * W;
+        const y = (-tmpVec.y * 0.5 + 0.5) * H;
+        // Hide labels behind the camera (z > 1 in NDC)
+        btn.style.display = tmpVec.z > 1 ? "none" : "block";
+        btn.style.left = `${x}px`;
+        btn.style.top = `${y}px`;
+      });
     };
     animate();
 
@@ -312,8 +295,7 @@ export function GraphView({
       el.removeEventListener("click", onClick);
       renderer.dispose();
       if (el.contains(renderer.domElement)) el.removeChild(renderer.domElement);
-      if (el.contains(labelRenderer.domElement))
-        el.removeChild(labelRenderer.domElement);
+      if (el.contains(labelContainer)) el.removeChild(labelContainer);
     };
   }, [notes, selectedNoteId, onSelectNote, theme]);
 
@@ -321,13 +303,7 @@ export function GraphView({
     <section
       className="graph-view"
       ref={mountRef}
-      style={{
-        position: "relative",
-        width: "100%",
-        height: "520px",
-        borderRadius: "12px",
-        overflow: "hidden",
-      }}
+      style={{ width: "100%", minHeight: "unset", height: "calc(100vh - 140px)", position: "relative" }}
     />
   );
 }
