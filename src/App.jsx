@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import './App.css'
 
@@ -24,6 +24,18 @@ const MIN_CHAT_RESPONSE_MS = 900
 
 function App() {
   const prefersReducedMotion = useReducedMotion()
+  const [theme, setTheme] = useState(() => {
+    const storedTheme = typeof window !== 'undefined' ? window.localStorage.getItem('theme') : null
+    if (storedTheme === 'light' || storedTheme === 'dark') {
+      return storedTheme
+    }
+
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: light)').matches) {
+      return 'light'
+    }
+
+    return 'dark'
+  })
   const [notes, setNotes] = useState(INITIAL_NOTES)
   const [activeView, setActiveView] = useState('dashboard')
   const [selectedNoteId, setSelectedNoteId] = useState(INITIAL_NOTES[0].id)
@@ -36,6 +48,11 @@ function App() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [sortMode, setSortMode] = useState('favorites')
   const [toasts, setToasts] = useState([])
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    window.localStorage.setItem('theme', theme)
+  }, [theme])
 
   function showToast(message, type = 'success') {
     const id = ++toastId
@@ -82,6 +99,29 @@ function App() {
       { x: '58%', y: '82%', size: 15 },
       { x: '71%', y: '68%', size: 12 },
       { x: '86%', y: '80%', size: 10 },
+    ],
+    [],
+  )
+
+  const ribbonSpecs = useMemo(
+    () => [
+      { className: 'ambient-ribbon ribbon-a', duration: 30, delay: 0 },
+      { className: 'ambient-ribbon ribbon-b', duration: 36, delay: 2.5 },
+      { className: 'ambient-ribbon ribbon-c', duration: 42, delay: 5 },
+    ],
+    [],
+  )
+
+  const sparkSpecs = useMemo(
+    () => [
+      { x: '12%', y: '18%' },
+      { x: '23%', y: '62%' },
+      { x: '36%', y: '26%' },
+      { x: '48%', y: '74%' },
+      { x: '61%', y: '34%' },
+      { x: '72%', y: '58%' },
+      { x: '84%', y: '22%' },
+      { x: '91%', y: '70%' },
     ],
     [],
   )
@@ -305,7 +345,7 @@ function App() {
     : { duration: 0.34, ease: [0.25, 0.1, 0.25, 1] }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell theme-${theme}`}>
       <link
         rel="stylesheet"
         href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;400;700;800&family=Inter:wght@300;400;500;600&display=swap"
@@ -338,8 +378,101 @@ function App() {
           transition={prefersReducedMotion ? { duration: 0 } : { duration: 54, repeat: Infinity, ease: 'easeInOut' }}
         />
 
-        <div className="ambient-cube-grid" />
-        <div className="ambient-cube-field">
+        {ribbonSpecs.map((ribbon, index) => (
+          <motion.span
+            key={ribbon.className}
+            className={ribbon.className}
+            animate={
+              prefersReducedMotion
+                ? {}
+                : {
+                    x: [0, 18, -16, 0],
+                    y: [0, -14, 10, 0],
+                    rotate: [0, 2.6, -1.9, 0],
+                    opacity: [0.2, 0.35, 0.2],
+                  }
+            }
+            transition={
+              prefersReducedMotion
+                ? { duration: 0 }
+                : {
+                    duration: ribbon.duration,
+                    repeat: Infinity,
+                    ease: 'easeInOut',
+                    delay: ribbon.delay,
+                  }
+            }
+          />
+        ))}
+
+        {sparkSpecs.map((spark, index) => (
+          <motion.span
+            key={`${spark.x}-${spark.y}`}
+            className="ambient-spark"
+            style={{ '--x': spark.x, '--y': spark.y }}
+            animate={
+              prefersReducedMotion
+                ? {}
+                : {
+                    scale: [0.9, 1.3, 0.92],
+                    opacity: [0.08, 0.42, 0.08],
+                    y: [0, -4, 0],
+                  }
+            }
+            transition={
+              prefersReducedMotion
+                ? { duration: 0 }
+                : {
+                    duration: 4.5 + (index % 4),
+                    repeat: Infinity,
+                    ease: 'easeInOut',
+                    delay: index * 0.45,
+                  }
+            }
+          />
+        ))}
+
+        <motion.div
+          className="ambient-cube-grid"
+          animate={
+            prefersReducedMotion
+              ? {}
+              : {
+                  opacity: [0.22, 0.34, 0.22],
+                  scale: [1, 1.012, 1],
+                }
+          }
+          transition={
+            prefersReducedMotion
+              ? { duration: 0 }
+              : {
+                  duration: 18,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                }
+          }
+        />
+        <motion.div
+          className="ambient-cube-field"
+          animate={
+            prefersReducedMotion
+              ? {}
+              : {
+                  rotate: [0, 0.6, -0.5, 0],
+                  scale: [1, 1.01, 1],
+                }
+          }
+          transition={
+            prefersReducedMotion
+              ? { duration: 0 }
+              : {
+                  duration: 26,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                }
+          }
+          style={{ transformOrigin: '50% 50%' }}
+        >
           {cubeSpecs.map((cube, index) => (
             <motion.span
               key={`${cube.x}-${cube.y}`}
@@ -349,16 +482,18 @@ function App() {
                 prefersReducedMotion
                   ? {}
                   : {
-                      y: [0, -2, 0],
-                      rotate: [45, 47, 45],
-                      opacity: [0.16, 0.28, 0.16],
+                      x: [0, 1.4, -1.2, 0],
+                      y: [0, -2.8, 1.5, 0],
+                      rotate: [45, 49, 43, 45],
+                      scale: [1, 1.03, 0.99, 1],
+                      opacity: [0.16, 0.3, 0.16],
                     }
               }
               transition={
                 prefersReducedMotion
                   ? { duration: 0 }
                   : {
-                      duration: 14 + (index % 5) * 2,
+                      duration: 12 + (index % 5) * 2,
                       repeat: Infinity,
                       ease: 'easeInOut',
                       delay: index * 0.2,
@@ -366,7 +501,7 @@ function App() {
               }
             />
           ))}
-        </div>
+        </motion.div>
       </motion.div>
 
       <LeftRail
@@ -384,6 +519,8 @@ function App() {
         <TopNav
           onCreateNote={createNewNote}
           onViewChange={setActiveView}
+          theme={theme}
+          onToggleTheme={() => setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))}
         />
 
         <AnimatePresence mode="wait">

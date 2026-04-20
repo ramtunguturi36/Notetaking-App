@@ -1,4 +1,4 @@
-export function TopNav({ onCreateNote, onViewChange }) {
+export function TopNav({ onCreateNote, onViewChange, theme = 'dark', onToggleTheme }) {
   return (
     <header className="top-nav">
       <div className="top-nav-brand">
@@ -11,6 +11,10 @@ export function TopNav({ onCreateNote, onViewChange }) {
         </div>
       </div>
       <div className="top-actions">
+        <button className="theme-toggle" onClick={onToggleTheme} title="Toggle light and dark theme">
+          <span className="material-symbols-outlined">{theme === 'light' ? 'dark_mode' : 'light_mode'}</span>
+          <span>{theme === 'light' ? 'Dark' : 'Light'}</span>
+        </button>
         <button onClick={() => onViewChange('search')}>Semantic Search</button>
         <button onClick={() => onViewChange('graph')}>Network</button>
         <button className="primary" onClick={onCreateNote}>
