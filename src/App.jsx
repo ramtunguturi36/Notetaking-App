@@ -676,6 +676,8 @@ function App() {
                 onRunSpark={runSpark}
                 onSave={saveCurrentNote}
                 showSlashMenu={showSlashMenu}
+                onOpenSlashMenu={() => setShowSlashMenu(true)}
+                onCloseSlashMenu={() => setShowSlashMenu(false)}
                 onToggleSlashMenu={() => setShowSlashMenu((prev) => !prev)}
               />
             )}
