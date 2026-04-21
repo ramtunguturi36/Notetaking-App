@@ -11,6 +11,7 @@ export const INITIAL_NOTES = [
     createdAt: "2026-01-11T09:00:00.000Z",
     updatedAt: "2026-01-11T10:10:00.000Z",
     inbox: true,
+    workspaceId: "w1",
   },
   {
     id: "n2",
@@ -27,6 +28,7 @@ export const INITIAL_NOTES = [
     createdAt: "2026-04-10T18:00:00.000Z",
     updatedAt: "2026-04-10T19:20:00.000Z",
     inbox: false,
+    workspaceId: "w1",
   },
   {
     id: "n3",
@@ -40,6 +42,7 @@ export const INITIAL_NOTES = [
     createdAt: "2026-04-09T12:40:00.000Z",
     updatedAt: "2026-04-12T07:30:00.000Z",
     inbox: false,
+    workspaceId: "w1",
   },
   {
     id: "n4",
@@ -56,6 +59,7 @@ export const INITIAL_NOTES = [
     createdAt: "2026-04-08T08:10:00.000Z",
     updatedAt: "2026-04-13T06:30:00.000Z",
     inbox: true,
+    workspaceId: "w1",
   },
   {
     id: "n5",
@@ -69,6 +73,7 @@ export const INITIAL_NOTES = [
     createdAt: "2026-04-07T15:40:00.000Z",
     updatedAt: "2026-04-13T18:20:00.000Z",
     inbox: false,
+    workspaceId: "w1",
   },
   {
     id: "n6",
@@ -82,6 +87,7 @@ export const INITIAL_NOTES = [
     createdAt: "2026-04-06T11:30:00.000Z",
     updatedAt: "2026-04-14T09:05:00.000Z",
     inbox: true,
+    workspaceId: "w1",
   },
   {
     id: "n7",
@@ -95,6 +101,7 @@ export const INITIAL_NOTES = [
     createdAt: "2026-04-05T20:00:00.000Z",
     updatedAt: "2026-04-14T21:55:00.000Z",
     inbox: false,
+    workspaceId: "w1",
   },
   {
     id: "n8",
@@ -108,6 +115,7 @@ export const INITIAL_NOTES = [
     createdAt: "2026-04-05T09:45:00.000Z",
     updatedAt: "2026-04-15T07:10:00.000Z",
     inbox: true,
+    workspaceId: "w1",
   },
   {
     id: "n9",
@@ -121,6 +129,7 @@ export const INITIAL_NOTES = [
     createdAt: "2026-04-04T16:20:00.000Z",
     updatedAt: "2026-04-15T12:05:00.000Z",
     inbox: false,
+    workspaceId: "w1",
   },
   {
     id: "n10",
@@ -133,6 +142,7 @@ export const INITIAL_NOTES = [
     createdAt: "2026-04-03T13:35:00.000Z",
     updatedAt: "2026-04-15T19:50:00.000Z",
     inbox: false,
+    workspaceId: "w1",
   },
   {
     id: "n11",
@@ -146,6 +156,7 @@ export const INITIAL_NOTES = [
     createdAt: "2026-04-03T08:25:00.000Z",
     updatedAt: "2026-04-16T06:55:00.000Z",
     inbox: true,
+    workspaceId: "w1",
   },
   {
     id: "n12",
@@ -158,6 +169,7 @@ export const INITIAL_NOTES = [
     createdAt: "2026-04-02T18:40:00.000Z",
     updatedAt: "2026-04-16T14:30:00.000Z",
     inbox: false,
+    workspaceId: "w1",
   },
   {
     id: "n13",
@@ -170,5 +182,6 @@ export const INITIAL_NOTES = [
     createdAt: "2026-04-02T07:15:00.000Z",
     updatedAt: "2026-04-16T20:05:00.000Z",
     inbox: true,
+    workspaceId: "w1",
   },
 ];
